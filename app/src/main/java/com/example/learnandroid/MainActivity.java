@@ -3,13 +3,9 @@ package com.example.learnandroid;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-
-import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.material.button.MaterialButton;
@@ -25,6 +21,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         tiePass = findViewById(R.id.tiePass);
         btnLogin = findViewById(R.id.btnLogin);
         tieEmail = findViewById(R.id.tieEmail);
@@ -39,13 +36,16 @@ public class MainActivity extends AppCompatActivity {
 
             if (Email.isEmpty() || Pass.isEmpty()) {
                 Toast.makeText(MainActivity.this, "Vui lòng nhập đầy đủ thông tin!", Toast.LENGTH_SHORT).show();
+                return; // Dừng lại không chạy tiếp code bên dưới
             }
 
             if (Email.equals(EmailDangKy) && Pass.equals(PassDangKy)) {
                 Toast.makeText(MainActivity.this, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show();
-                Intent profileIntent = new Intent(MainActivity.this, Profile.class);
-                startActivity(profileIntent);
-                finish();
+
+                // ĐÃ CẬP NHẬT: Chuyển sang màn hình Feed
+                Intent feedIntent = new Intent(MainActivity.this, Feed.class);
+                startActivity(feedIntent);
+                finish(); // Đóng màn hình đăng nhập
             } else {
                 Toast.makeText(MainActivity.this, "Đăng nhập thất bại!", Toast.LENGTH_SHORT).show();
             }
