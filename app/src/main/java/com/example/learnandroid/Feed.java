@@ -1,8 +1,14 @@
 package com.example.learnandroid;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.view.ContextMenu;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,8 +24,11 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar; // ĐÃ THÊM IMPORT TOOLBAR
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -28,9 +37,13 @@ import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class Feed extends AppCompatActivity {
+
+    // ĐÃ THÊM: Mã Request Code để xử lý quyền đọc danh bạ
+    private static final int READ_CONTACTS_REQUEST_CODE = 100;
 
     private EditText edtIdea;
     private Button btnPost;
@@ -108,7 +121,7 @@ public class Feed extends AppCompatActivity {
     }
 
     // ==========================================
-    // XỬ LÝ OPTION MENU (Góc phải trên)
+    // XỬ LÝ OPTION MENU
     // ==========================================
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -121,7 +134,7 @@ public class Feed extends AppCompatActivity {
         int id = item.getItemId();
 
         if (id == R.id.opt_profile) {
-            // ĐÃ CẬP NHẬT: Bấm vào Profile trên Menu -> Mở màn hình Profile
+
             Intent profileIntent = new Intent(Feed.this, Profile.class);
             startActivity(profileIntent);
             return true;
@@ -132,8 +145,100 @@ public class Feed extends AppCompatActivity {
         } else if (id == R.id.opt_sort_author) {
             Toast.makeText(this, "Sắp xếp theo tác giả", Toast.LENGTH_SHORT).show();
             return true;
+
         }
+        // ==========================================
+        //  Xử lý nút Gợi ý kết bạn từ danh bạ
+        // ==========================================
+        else if (id == R.id.menu_suggest_friends) {
+            // Kiểm tra xem đã có quyền đọc danh bạ chưa
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                // Nếu chưa có, hiện hộp thoại xin quyền
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_CONTACTS}, READ_CONTACTS_REQUEST_CODE);
+            } else {
+                // Nếu có rồi thì load danh bạ và hiện Dialog
+                loadContactsAndShowDialog();
+            }
+            return true;
+        }
+
         return super.onOptionsItemSelected(item);
+    }
+
+    // ==========================================
+    // ĐÃ THÊM: XỬ LÝ KẾT QUẢ KHI NGƯỜI DÙNG CẤP/TỪ CHỐI QUYỀN
+    // ==========================================
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == READ_CONTACTS_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Người dùng đã cho phép
+                loadContactsAndShowDialog();
+            } else {
+                // Người dùng từ chối
+                Toast.makeText(this, "Cần cấp quyền danh bạ để tìm bạn bè!", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // ==========================================
+    // HÀM ĐỌC DANH BẠ VÀ HIỂN THỊ POPUP
+    // ==========================================
+    private void loadContactsAndShowDialog() {
+        List<String> contactsList = new ArrayList<>();
+        ContentResolver contentResolver = getContentResolver();
+
+        Cursor cursor = contentResolver.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                null, null, null,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC"
+        );
+
+        if (cursor != null && cursor.getCount() > 0) {
+            while (cursor.moveToNext()) {
+                @SuppressLint("Range") String id = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
+                @SuppressLint("Range") String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+                @SuppressLint("Range") int hasPhoneNumber = Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)));
+
+                if (hasPhoneNumber > 0) {
+                    Cursor phoneCursor = contentResolver.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            new String[]{id}, null
+                    );
+                    if (phoneCursor != null) {
+                        while (phoneCursor.moveToNext()) {
+                            @SuppressLint("Range") String phoneNumber = phoneCursor.getString(phoneCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                            // Format hiển thị cho từng hàng
+                            contactsList.add(name + "\n" + phoneNumber);
+                        }
+                        phoneCursor.close();
+                    }
+                }
+            }
+            cursor.close();
+        }
+
+        if (contactsList.isEmpty()) {
+            Toast.makeText(this, "Không tìm thấy số điện thoại nào trong danh bạ!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Đổ danh sách vào một AlertDialog
+        ArrayAdapter<String> dialogAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, contactsList);
+        new AlertDialog.Builder(this)
+                .setTitle("Gợi ý kết bạn từ danh bạ")
+                .setAdapter(dialogAdapter, (dialog, which) -> {
+                    // Sự kiện khi bấm vào 1 người trong danh sách
+                    String selectedContact = contactsList.get(which);
+                    String friendName = selectedContact.split("\n")[0]; // Cắt lấy tên
+
+                    Toast.makeText(Feed.this, "Đã gửi lời mời kết bạn đến: " + friendName, Toast.LENGTH_SHORT).show();
+                })
+                .setPositiveButton("Đóng", null)
+                .show();
     }
 
     // ==========================================

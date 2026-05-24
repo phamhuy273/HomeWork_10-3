@@ -2,4 +2,5 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/ctx_detail" android:title="Detail" />
     <item android:id="@+id/ctx_hide" android:title="Hide" />
+
 </menu>
